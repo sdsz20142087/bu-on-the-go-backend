@@ -33,6 +33,7 @@ class Event(db.Model):
     repeat_mode = db.Column(db.Integer)
     priority = db.Column(db.Integer)
     desc = db.Column(db.Text)
+    notify_time = db.Column(db.Integer)  # in minutes
 
     def __repr__(self):
         return '<Event {}>'.format(self.event_name)
@@ -66,3 +67,21 @@ class SharedEventParticipance(db.Model):
     def __repr__(self):
         return '<SharedEventParticipance {}{}>'.format(self.shared_event_id, self.user_id)
 
+
+class Group(db.Model):
+    __tablename__ = 'group_table'
+    group_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    group_name = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=db.func.current_time())
+    owner_id = db.Column(db.Integer)  # , db.ForeignKey('user.user_id'))
+
+    def __repr__(self):
+        return '<Group {}>'.format(self.group_name)
+
+
+class GroupMember(db.Model):
+    group_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, primary_key=True)
+
+    def __repr__(self):
+        return '<GroupMember {}{}>'.format(self.group_id, self.user_id)

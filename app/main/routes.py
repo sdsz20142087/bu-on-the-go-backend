@@ -4,19 +4,24 @@ from flask import jsonify, request
 from app.models import *
 
 
+def serialize(obj):
+    return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+
+
 def authenticate(func):
     def wrapper(*args, **kwargs):
         token = request.headers.get('Authorization')
         if token:
             try:
                 token = token.split(' ')[1]
+                # print(token)
                 user_id = jwt.decode(token, 'secret', algorithms=['HS256'])['user_id']
                 # put user_id in func's args
                 kwargs['user_id'] = user_id
-                return func(*args, **kwargs)
             except Exception as e:
                 print(e)
                 return jsonify({'message': 'Invalid token.'}), 401
+            return func(*args, **kwargs)
         else:
             return jsonify({'message': 'Token is missing.'}), 401
 
@@ -69,7 +74,7 @@ def event_list(user_id):
     # get all events for the user
     events = Event.query.filter(Event.calendar_id.in_([calendar.calendar_id for calendar in calendars])).all()
 
-    return jsonify({'events': [vars(event) for event in events]}), 200
+    return jsonify({'events': [serialize(event) for event in events]}), 200
 
 
 @bp.route('/event/<int:event_id>', methods=['GET'])
@@ -83,7 +88,7 @@ def event_details(user_id, event_id):
     calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
     if len(calendar_events) > 0:
         # user has access to this event
-        return jsonify({'event': vars(event)}), 200
+        return jsonify({'event': serialize(event)}), 200
     else:
         return jsonify({'message': 'You are not authorized to view this event.'}), 401
 
@@ -91,24 +96,27 @@ def event_details(user_id, event_id):
 @bp.route('/event', methods=['POST'])
 @authenticate
 def create_event(user_id):
-    # get user's calendars
-    calendars = Calendar.query.filter_by(email=User.query.get(user_id).email).all()
-    calendar = calendars[0]  # TODO: handle multiple calendars
-    calendar_id = calendar.calendar_id
-
-    event_name = request.json.get('event_name')
-    latitude = request.json.get('latitude')
-    longitude = request.json.get('longitude')
-    start_time = request.json.get('start_time')
-    end_time = request.json.get('end_time')
-    repeat_mode = request.json.get('repeat_mode')
-    priority = request.json.get('priority')
-    desc = request.json.get('desc')
-    event = Event(event_name=event_name, calendar_id=calendar_id, latitude=latitude, longitude=longitude,
-                  start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc)
-    db.session.add(event)
-    db.session.commit()
-    return jsonify({'message': 'Event created successfully.'}), 201
+    try:
+        # get user's calendars
+        calendars = Calendar.query.filter_by(email=User.query.get(user_id).email).all()
+        calendar = calendars[0]  # TODO: handle multiple calendars
+        calendar_id = calendar.calendar_id
+        event_name = request.json.get('event_name')
+        latitude = request.json.get('latitude')
+        longitude = request.json.get('longitude')
+        start_time = request.json.get('start_time')
+        end_time = request.json.get('end_time')
+        repeat_mode = request.json.get('repeat_mode')
+        priority = request.json.get('priority')
+        desc = request.json.get('desc')
+        event = Event(event_name=event_name, calendar_id=calendar_id, latitude=latitude, longitude=longitude,
+                      start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc)
+        db.session.add(event)
+        db.session.commit()
+        return jsonify({'message': 'Event created successfully.'}), 201
+    except Exception as e:
+        print(e)
+        return jsonify({'message': 'Event creation failed.'}), 500
 
 
 @bp.route('/event/<int:event_id>', methods=['DELETE'])
@@ -128,9 +136,9 @@ def delete_event(user_id, event_id):
 
 
 @bp.route('/shared_event/<int:event_id>', methods=['GET'])
-def shared_events(event_id):
-    # TODO: handle authentication
-    s_events = SharedEvent.query.filter_by(event_id=event_id).all()
+@authenticate
+def shared_events(user_id, event_id):
+    # shared_event = SharedEvent.query.filter_by(event_id=event_id,user_id).all()
     return jsonify({'shared_events': [shared_event.shared_event_id for shared_event in s_events]}), 200
 
 
@@ -187,6 +195,97 @@ def delete_shared_event_participance():
         return jsonify({'message': 'Shared event participance deleted successfully.'}), 200
     else:
         return jsonify({'message': 'Shared event participance not found.'}), 404
+
+
+@bp.route('/group/<int:group_id>', methods=['GET'])
+@authenticate
+def group(user_id, group_id):
+    group = Group.query.get(group_id)
+    if group:
+        # check if user is in group
+        group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+        if group_member:
+            print(serialize(group))
+            print(group.__dict__)
+            data = serialize(group)
+            data.pop('_sa_instance_state')
+            return jsonify({'group': serialize(group)}), 200
+    else:
+        return jsonify({'message': 'Group not found.'}), 404
+
+
+@bp.route('/group/<int:group_id>/list', methods=['GET'])  # This is used to get all members in a group
+@authenticate
+def group_member_list(user_id, group_id):
+    group = Group.query.get(group_id)
+    if group:
+        # check if user is in group
+        group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+        if group_member:
+            group_members = GroupMember.query.filter_by(group_id=group_id).all()
+            return jsonify({'group_members': [group_member.user_id for group_member in group_members]}), 200
+    else:
+        return jsonify({'message': 'Group not found.'}), 404
+
+
+@bp.route('/group/<int:group_id>/list', methods=['POST'])  # This is used to add a member to a group
+@authenticate
+def add_group_member(user_id, group_id):
+    group = Group.query.get(group_id)
+    if group:
+        # check if user is the owner of the group
+        if group.owner_id == user_id:
+            user_id = request.json.get('user_id')
+            group_member = GroupMember(group_id=group_id, user_id=user_id)
+            db.session.add(group_member)
+            db.session.commit()
+            return jsonify({'message': 'Group member added successfully.'}), 201
+        else:
+            return jsonify({'message': 'You are not the owner of the group.'}), 403
+    else:
+        return jsonify({'message': 'Group not found.'}), 404
+
+
+@bp.route('/group/<int:group_id>/list', methods=['DELETE'])  # This is used to remove a member from a group
+@authenticate
+def remove_group_member(user_id, group_id):
+    group = Group.query.get(group_id)
+    if group:
+        # check if user is the owner of the group
+        if group.owner_id == user_id:
+            user_id = request.json.get('user_id')
+            group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+            if group_member:
+                db.session.delete(group_member)
+                db.session.commit()
+                return jsonify({'message': 'Group member removed successfully.'}), 200
+            else:
+                return jsonify({'message': 'Group member not found.'}), 404
+        else:
+            return jsonify({'message': 'You are not the owner of the group.'}), 403
+    else:
+        return jsonify({'message': 'Group not found.'}), 404
+
+
+@bp.route('/group', methods=['POST'])
+@authenticate
+def create_group(user_id):
+    # print(request.json)
+    group_name = request.json.get('group_name')
+    group = Group(group_name=group_name, owner_id=user_id)
+    db.session.add(group)
+    db.session.commit()
+    # update group_member table
+    group_member = GroupMember(group_id=group.group_id, user_id=user_id)
+    db.session.add(group_member)
+    db.session.commit()
+    return jsonify({'message': 'Group created successfully.'}), 201
+
+
+@bp.route('/group/<int:group_id>', methods=['DELETE'])
+@authenticate
+def delete_group(user_id, group_id):
+    pass
 
 
 @bp.route('/sync/int:user_id', methods=['POST'])
