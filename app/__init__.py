@@ -11,7 +11,6 @@ def create_app(config_class=Config):
 
     # Initialize SQLAlchemy
     db.init_app(app)
-
     # Register blueprints
     from app.main import bp as main_bp
     app.register_blueprint(main_bp)
@@ -19,7 +18,9 @@ def create_app(config_class=Config):
     @app.route('/test/')
     def test_page():
         return '<h1>Testing the Flask Application Factory Pattern</h1>'
-
+    with app.app_context():
+        #db.drop_all()
+        db.create_all()
     return app
 
 

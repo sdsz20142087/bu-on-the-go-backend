@@ -2,7 +2,7 @@ import jwt
 from app.main import bp
 from flask import jsonify, request
 from app.models import *
-
+import json
 
 def serialize(obj):
     return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
@@ -33,35 +33,36 @@ def authenticate(func):
 def index():
     return 'Hello World'
 
-
 @bp.route('/register', methods=['POST'])
 def register():
-    email = request.json.get('email')
-    full_name = request.json.get('full_name')
+    email = request.values.get('email')
+    full_name = request.values.get('full_name')
     # created_at = time.time()
     # print(created_at)
-    password = request.json.get('password')
-    user_type = request.json.get('user_type')
+    password = request.values.get('password')
+    user_type = request.values.get('user_type')
     user = User(email=email, full_name=full_name, password=password, user_type=user_type)
     try:
         db.session.add(user)
         db.session.commit()
+        print('User created successfully.',user.as_dict, user.created_at)
     except Exception as e:
         print(e)
         return jsonify({'message': 'User creation failed.'}), 500
-    return jsonify({'message': 'User created successfully.'}), 201
+    assert user.user_id != None
+    return jsonify({'message': 'User created successfully.','user':user.as_dict}), 200
 
 
 @bp.route('/login', methods=['POST'])
 def login():
-    email = request.json.get('email')
-    password = request.json.get('password')
+    email = request.values.get('email')
+    password = request.values.get('password')
     user = User.query.filter_by(email=email).first()
     if user and user.password == password:
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
                            algorithm='HS256')
-        return jsonify({'token': token, 'message': 'Login successful.'}), 200
+        return jsonify({'token': str(token), 'message': 'Login successful.'}), 200
     else:
         return jsonify({'message': 'Invalid credentials.'}), 401
 
