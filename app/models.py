@@ -1,8 +1,9 @@
 from app.extensions import db
-import datetime, time
+import datetime, time, uuid
+from sqlalchemy.dialects.mysql import CHAR
 
 class User(db.Model):
-    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True, default=str(uuid.uuid4()))
     email = db.Column(db.String(255), unique=True)
     full_name = db.Column(db.String(255))
     created_at = db.Column(db.DateTime(timezone=True), default=db.func.now(), nullable=False)
@@ -31,7 +32,7 @@ class Calendar(db.Model):
         return { 'calendar_id': self.calendar_id, 'user_id': self.user_id, 'calendar_name': self.calendar_name, 'calendar_type': self.calendar_type}
 
 class Event(db.Model):
-    event_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    event_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True, default=str(uuid.uuid4()))
     event_name = db.Column(db.String(255))
     latitude = db.Column(db.DECIMAL)
     longitude = db.Column(db.DECIMAL)
@@ -40,6 +41,7 @@ class Event(db.Model):
     repeat_mode = db.Column(db.Integer)
     priority = db.Column(db.Integer)
     desc = db.Column(db.Text)
+    created_by = db.Column(CHAR(36, charset='utf8mb4'))
     notify_time = db.Column(db.Integer)  # in minutes
 
     def __repr__(self):
@@ -54,7 +56,7 @@ class Event(db.Model):
 class CalendarEvent(db.Model):
     __tablename__ = 'calendar_event'
     calendar_id = db.Column(db.Integer, primary_key=True)
-    event_id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(CHAR(36, charset='utf8mb4'))
 
     def __repr__(self):
         return '<CalendarEvent {}{}>'.format(self.calendar_id, self.event_id)
@@ -66,8 +68,8 @@ class CalendarEvent(db.Model):
 
 class SharedEvent(db.Model):
     shared_event_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    event_id = db.Column(db.Integer)  # , db.ForeignKey('event.event_id'))
-    owner_id = db.Column(db.Integer)  # , db.ForeignKey('user.user_id'))
+    event_id = db.Column(CHAR(36, charset='utf8mb4'))  # , db.ForeignKey('event.event_id'))
+    owner_id = db.Column(CHAR(36, charset='utf8mb4'))  # , db.ForeignKey('user.user_id'))
     created_at = db.Column(db.DateTime(timezone=True), default=db.func.now(), nullable=False)
     checkin_time = db.Column(db.DateTime(timezone=True))
 
@@ -81,7 +83,7 @@ class SharedEvent(db.Model):
 
 class SharedEventParticipance(db.Model):
     shared_event_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(CHAR(36, charset='utf8mb4'))
     status = db.Column(db.Enum('FAIL', 'SUCCESS'))
 
     def __repr__(self):
@@ -97,7 +99,8 @@ class Group(db.Model):
     group_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     group_name = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=db.func.current_time())
-    owner_id = db.Column(db.Integer)  # , db.ForeignKey('user.user_id'))
+    desc = db.Column(db.Text)
+    owner_id = db.Column(CHAR(36, charset='utf8mb4'))  # , db.ForeignKey('user.user_id'))
 
     def __repr__(self):
         return '<Group {}>'.format(self.group_name)
@@ -105,7 +108,7 @@ class Group(db.Model):
 
 class GroupMember(db.Model):
     group_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(CHAR(36, charset='utf8mb4'))
 
     def __repr__(self):
         return '<GroupMember {}{}>'.format(self.group_id, self.user_id)
