@@ -18,15 +18,16 @@ def serialize(obj):
 def authenticate(func):
     def wrapper(*args, **kwargs):
         token = request.headers.get('Authorization')
+        print('got token:',token)
         if token:
             try:
                 token = token.split(' ')[1]
-                # print(token)
+                print('token:', token)
                 user_id = jwt.decode(token, 'secret', algorithms=['HS256'])['user_id']
                 # put user_id in func's args
                 kwargs['user_id'] = user_id
             except Exception as e:
-                print(e)
+                # print the stack trace
                 return jsonify({'message': 'Invalid token.'}), 401
             return func(*args, **kwargs)
         else:
@@ -39,6 +40,11 @@ def authenticate(func):
 @bp.route('/')
 def index():
     return 'Hello World'
+
+@bp.route('/ping',methods=['POST'])
+@authenticate
+def handle_ping(user_id):
+    return jsonify({'message': 'pong'}), 200
 
 
 @bp.route('/register', methods=['POST'])
@@ -72,8 +78,8 @@ def login():
     if user and user.password == password:
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
-                           algorithm='HS256')
-        return jsonify({'token': str(token), 'message': 'Login successful.'}), 200
+                           algorithm='HS256').decode('utf-8')
+        return jsonify({'token': "Bearer "+token, 'message': 'Login successful.', 'user':serialize(user)}), 200
     else:
         return jsonify({'message': 'Invalid credentials.'}), 401
 
