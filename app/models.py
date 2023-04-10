@@ -1,6 +1,27 @@
 from app.extensions import db
+from typing import List
 import datetime, time, uuid
 from sqlalchemy.dialects.mysql import CHAR
+
+class SyncData():
+    def __init__(self) -> None:
+        self.users: List[User] = []
+        self.groups: List[Group] = []
+        self.group_members: List[GroupMember] = []
+        self.events: List[Event] = []
+        self.shared_events: List[SharedEvent] = []
+        self.shared_event_participances: List[SharedEventParticipance] = []
+
+    def flatten(self)->List[db.Model]:
+        return self.users + self.groups + self.group_members + self.events + self.shared_events + self.shared_event_participances
+    
+    def __repr__(self) -> str:
+        return f"SyncData(users*{len(self.users)},\
+              groups*{len(self.groups)},\
+                  group_members*{len(self.group_members)},\
+                      events*{len(self.events)},\
+                          shared_events*{len(self.shared_events)}, \
+                            shared_event_participances*{len(self.shared_event_participances)})"
 
 
 class User(db.Model):

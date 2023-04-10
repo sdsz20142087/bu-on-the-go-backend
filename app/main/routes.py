@@ -1,8 +1,8 @@
-import jwt
+import jwt, json
 from app.main import bp
 from flask import jsonify, request
 from app.models import *
-
+from types import SimpleNamespace
 
 def serialize(obj):
     data = {}
@@ -339,13 +339,22 @@ def delete_group(user_id, group_id):
         return jsonify({'message': 'Group not found.'}), 404
 
 
-@bp.route('/sync/int:user_id', methods=['POST'])
+@bp.route('/sync', methods=['POST'])
+@authenticate
 def sync(user_id):
     # TODO: Implement sync endpoint
-    return jsonify({'message': 'Synced successfully.'}), 200
+    json_data = request.get_json(force=True)
+    sync_data:SyncData = json.loads(json_data, object_hook=lambda d: SimpleNamespace(**d))
+    db.session.begin()
+    try:
+        # upsert all objects in sync_data
+        # put everything into one list
+        all_objects = sync_data.flatten()
+        db.session.add_all(all_objects)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({'message': 'Sync failed.','data':None}), 500
+    return jsonify({'message': 'Synced successfully.','data':None}), 200
 
-
-@bp.route('/sync/int:user_id', methods=['GET'])
-def sync_pull(user_id):
-    # TODO: Implement sync pull endpoint
-    return jsonify({'message': 'Sync pull successful.'}), 200
