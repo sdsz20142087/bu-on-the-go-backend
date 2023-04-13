@@ -107,7 +107,7 @@ class SharedEvent(db.Model):
 
 class SharedEventParticipance(db.Model):
     shared_event_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(CHAR(36, charset='utf8mb4'))
+    user_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True)
     status = db.Column(db.Enum('FAIL', 'SUCCESS'))
 
     def __repr__(self):

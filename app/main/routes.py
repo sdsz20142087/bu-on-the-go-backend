@@ -4,6 +4,7 @@ from flask import jsonify, request
 from app.models import *
 from types import SimpleNamespace
 
+
 def serialize(obj):
     data = {}
     for c in obj.__table__.columns:
@@ -18,7 +19,7 @@ def serialize(obj):
 def authenticate(func):
     def wrapper(*args, **kwargs):
         token = request.headers.get('Authorization')
-        print('got token:',token)
+        print('got token:', token)
         if token:
             try:
                 token = token.split(' ')[1]
@@ -41,7 +42,8 @@ def authenticate(func):
 def index():
     return 'Hello World'
 
-@bp.route('/ping',methods=['POST'])
+
+@bp.route('/ping', methods=['POST'])
 @authenticate
 def handle_ping(user_id):
     return jsonify({'message': 'pong'}), 200
@@ -79,7 +81,7 @@ def login():
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
                            algorithm='HS256').decode('utf-8')
-        return jsonify({'token': "Bearer "+token, 'message': 'Login successful.', 'user':serialize(user)}), 200
+        return jsonify({'token': "Bearer " + token, 'message': 'Login successful.', 'user': serialize(user)}), 200
     else:
         return jsonify({'message': 'Invalid credentials.'}), 401
 
@@ -235,8 +237,10 @@ def delete_shared_event_participance(user_id):  # only the owner can delete part
     owner_id = shared_event.owner_id
     if owner_id != user_id:
         return jsonify({'message': 'You are not authorized to delete participants from this shared event.'}), 401
-    shared_event_participance_id = request.values.get('shared_event_participance_id')
-    shared_event_participance = SharedEventParticipance.query.get(shared_event_participance_id)
+    shared_event_id = request.values.get('shared_event_id')
+    user_id = request.values.get('user_id')
+    shared_event_participance = SharedEventParticipance.query.filter_by(shared_event_id=shared_event_id,
+                                                                        user_id=user_id).first()
     if shared_event_participance:
         db.session.delete(shared_event_participance)
         db.session.commit()
@@ -350,7 +354,7 @@ def delete_group(user_id, group_id):
 def sync(user_id):
     # TODO: Implement sync endpoint
     json_data = request.get_json(force=True)
-    sync_data:SyncData = json.loads(json_data, object_hook=lambda d: SimpleNamespace(**d))
+    sync_data: SyncData = json.loads(json_data, object_hook=lambda d: SimpleNamespace(**d))
     db.session.begin()
     try:
         # upsert all objects in sync_data
@@ -361,6 +365,5 @@ def sync(user_id):
     except Exception as e:
         db.session.rollback()
         print(e)
-        return jsonify({'message': 'Sync failed.','data':None}), 500
-    return jsonify({'message': 'Synced successfully.','data':None}), 200
-
+        return jsonify({'message': 'Sync failed.', 'data': None}), 500
+    return jsonify({'message': 'Synced successfully.', 'data': None}), 200
