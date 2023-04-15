@@ -207,6 +207,34 @@ def shared_event_participance_list(user_id, shared_event_id):
     return jsonify({'shared_event_participances': [serialize(shared_event_participance) for shared_event_participance in
                                                    shared_event_participances]}), 200
 
+@bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['GET'])
+@authenticate
+def get_shared_event_participance(user_id, shared_event_participance_id):
+    shared_event_participance = SharedEventParticipance.query.get(shared_event_participance_id)
+    if not shared_event_participance:
+        return jsonify({'message': 'Shared event participance not found.'}), 404
+    shared_event_id = shared_event_participance.shared_event_id
+    shared_event = SharedEvent.query.get(shared_event_id)
+    owner_id = shared_event.owner_id
+    if owner_id != user_id and user_id != shared_event_participance.user_id:
+        return jsonify({'message': 'You are not authorized to view this shared event.'}), 401
+    return jsonify({'shared_event_participance': serialize(shared_event_participance)}), 200
+
+@bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['POST'])
+@authenticate
+def update_shared_event_participance(user_id, shared_event_participance_id):
+    shared_event_participance = SharedEventParticipance.query.get(shared_event_participance_id)
+    if not shared_event_participance:
+        return jsonify({'message': 'Shared event participance not found.'}), 404
+    shared_event_id = shared_event_participance.shared_event_id
+    shared_event = SharedEvent.query.get(shared_event_id)
+    owner_id = shared_event.owner_id
+    if owner_id != user_id and user_id != shared_event_participance.user_id:
+        return jsonify({'message': 'You are not authorized to edit this shared event.'}), 401
+    status = request.values.get('status')
+    shared_event_participance.status = status
+    db.session.commit()
+    return jsonify({'message': 'Shared event participance updated successfully.'}), 200
 
 @bp.route('/shared_event_participance', methods=['POST'])
 @authenticate
@@ -224,7 +252,9 @@ def create_shared_event_participance(user_id):  # only the owner or the user the
     shared_event_participance = SharedEventParticipance(shared_event_id=shared_event_id, user_id=user_id, status=status)
     db.session.add(shared_event_participance)
     db.session.commit()
-    return jsonify({'message': 'Shared event participance created successfully.'}), 201
+    shared_event_participance_id = shared_event_participance.shared_event_participance_id
+    return jsonify({'message': 'Shared event participance created successfully.', 'shared_event_participance_id':
+        shared_event_participance_id}), 201
 
 
 @bp.route('/shared_event_participance', methods=['DELETE'])
