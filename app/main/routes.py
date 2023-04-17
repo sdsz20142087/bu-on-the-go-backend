@@ -140,6 +140,15 @@ def event_details(user_id, event_id):
         return jsonify({'message': 'You are not authorized to view this event.'}), 401
 
 
+@bp.route('/user', methods=['GET'])
+@authenticate
+def get_user(user_id):
+    uu = request.values.get('user_id')
+    u = User.query.filter(User.user_id == uu).first()
+    if not u:
+        return jsonify({'message': 'User not found.'}), 404
+    return jsonify({'user': serialize(u),'message':'ok'}), 200
+
 @bp.route('/event', methods=['POST'])
 @authenticate
 def create_event(user_id):
@@ -308,6 +317,14 @@ def delete_shared_event_participance(user_id):  # only the owner can delete part
     else:
         return jsonify({'message': 'Shared event participance not found.'}), 404
 
+@bp.route('/group/list',methods=['GET'])
+@authenticate
+def list_group(user_id):
+    group_members = GroupMember.query.filter_by(user_id=user_id).all()
+    group_ids = [group_member.group_id for group_member in group_members]
+    groups = Group.query.filter(Group.group_id.in_(group_ids)).all()
+    return jsonify({'groups': [serialize(group) for group in groups],'message':'ok'}), 200
+
 
 @bp.route('/group/<int:group_id>', methods=['GET'])
 @authenticate
@@ -317,10 +334,7 @@ def group(user_id, group_id):
         # check if user is in group
         group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
         if group_member:
-            print(serialize(group))
-            data = serialize(group)
-            data.pop('_sa_instance_state')
-            return jsonify({'group': serialize(group)}), 200
+            return jsonify({'group': serialize(group),'message':'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
@@ -334,7 +348,7 @@ def group_member_list(user_id, group_id):
         group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
         if group_member:
             group_members = GroupMember.query.filter_by(group_id=group_id).all()
-            return jsonify({'group_members': [group_member.user_id for group_member in group_members]}), 200
+            return jsonify({'group_members': [group_member.user_id for group_member in group_members],'message':'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
@@ -383,7 +397,7 @@ def remove_group_member(user_id, group_id):
 def create_group(user_id):
     # print(request.values)
     group_name = request.values.get('group_name')
-    group = Group(group_name=group_name, owner_id=user_id)
+    group = Group(group_name=group_name, owner_id=user_id, desc=request.values.get('desc') or "")
     db.session.add(group)
     db.session.commit()
     # update group_member table
