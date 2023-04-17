@@ -3,6 +3,8 @@ from app.main import bp
 from flask import jsonify, request
 from app.models import *
 from types import SimpleNamespace
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 
 def serialize(obj):
@@ -47,6 +49,31 @@ def index():
 @authenticate
 def handle_ping(user_id):
     return jsonify({'message': 'pong'}), 200
+
+
+@bp.route('/google_login', methods=['POST'])
+def google_login():
+    google_token = request.values.get('google_token')
+    try:
+        idinfo = id_token.verify_oauth2_token(google_token, requests.Request())
+        print(idinfo)
+        if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+            return jsonify({'message': 'Invalid token.'}), 401
+        # ID token is valid. Get the user's Google Account email from the decoded token.
+        email = idinfo['email']
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            # create a new user
+            user = User(email=email, full_name=idinfo['name'], user_type='student')
+            db.session.add(user)
+            db.session.commit()
+        # generate token for the user
+        token = jwt.encode({'user_id': user.user_id}, 'secret',
+                           algorithm='HS256').decode('utf-8')
+        return jsonify({'token': "Bearer " + token, 'message': 'Login successful.', 'user': serialize(user)}), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'message': 'Invalid token.'}), 401
 
 
 @bp.route('/register', methods=['POST'])
@@ -207,6 +234,7 @@ def shared_event_participance_list(user_id, shared_event_id):
     return jsonify({'shared_event_participances': [serialize(shared_event_participance) for shared_event_participance in
                                                    shared_event_participances]}), 200
 
+
 @bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['GET'])
 @authenticate
 def get_shared_event_participance(user_id, shared_event_participance_id):
@@ -219,6 +247,7 @@ def get_shared_event_participance(user_id, shared_event_participance_id):
     if owner_id != user_id and user_id != shared_event_participance.user_id:
         return jsonify({'message': 'You are not authorized to view this shared event.'}), 401
     return jsonify({'shared_event_participance': serialize(shared_event_participance)}), 200
+
 
 @bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['POST'])
 @authenticate
@@ -235,6 +264,7 @@ def update_shared_event_participance(user_id, shared_event_participance_id):
     shared_event_participance.status = status
     db.session.commit()
     return jsonify({'message': 'Shared event participance updated successfully.'}), 200
+
 
 @bp.route('/shared_event_participance', methods=['POST'])
 @authenticate

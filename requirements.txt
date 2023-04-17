@@ -2,3 +2,5 @@ Flask==2.2.2
 Flask_SQLAlchemy==2.5.1
 PyJWT==2.6.0
 pytest==7.2.2
+google-auth==2.17.3
+SQLAlchemy~=2.0.9
