@@ -56,20 +56,24 @@ def google_login():
     google_token = request.values.get('google_token')
     try:
         idinfo = id_token.verify_oauth2_token(google_token, requests.Request())
-        print(idinfo)
         if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
             return jsonify({'message': 'Invalid token.'}), 401
         # ID token is valid. Get the user's Google Account email from the decoded token.
         email = idinfo['email']
+        full_name = idinfo['name']
         user = User.query.filter_by(email=email).first()
+        password = '123'
         if not user:
+            print(idinfo)
             # create a new user
-            user = User(email=email, full_name=idinfo['name'], user_type='student')
+            user = User(email=email, full_name=full_name, password=password, user_type='student')
+            print(user.email)
             db.session.add(user)
             db.session.commit()
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
                            algorithm='HS256').decode('utf-8')
+        print('jwt', token)
         return jsonify({'token': "Bearer " + token, 'message': 'Login successful.', 'user': serialize(user)}), 200
     except Exception as e:
         print(e)
@@ -147,7 +151,8 @@ def get_user(user_id):
     u = User.query.filter(User.user_id == uu).first()
     if not u:
         return jsonify({'message': 'User not found.'}), 404
-    return jsonify({'user': serialize(u),'message':'ok'}), 200
+    return jsonify({'user': serialize(u), 'message': 'ok'}), 200
+
 
 @bp.route('/event', methods=['POST'])
 @authenticate
@@ -317,13 +322,14 @@ def delete_shared_event_participance(user_id):  # only the owner can delete part
     else:
         return jsonify({'message': 'Shared event participance not found.'}), 404
 
-@bp.route('/group/list',methods=['GET'])
+
+@bp.route('/group/list', methods=['GET'])
 @authenticate
 def list_group(user_id):
     group_members = GroupMember.query.filter_by(user_id=user_id).all()
     group_ids = [group_member.group_id for group_member in group_members]
     groups = Group.query.filter(Group.group_id.in_(group_ids)).all()
-    return jsonify({'groups': [serialize(group) for group in groups],'message':'ok'}), 200
+    return jsonify({'groups': [serialize(group) for group in groups], 'message': 'ok'}), 200
 
 
 @bp.route('/group/<int:group_id>', methods=['GET'])
@@ -334,7 +340,7 @@ def group(user_id, group_id):
         # check if user is in group
         group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
         if group_member:
-            return jsonify({'group': serialize(group),'message':'ok'}), 200
+            return jsonify({'group': serialize(group), 'message': 'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
@@ -348,7 +354,8 @@ def group_member_list(user_id, group_id):
         group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
         if group_member:
             group_members = GroupMember.query.filter_by(group_id=group_id).all()
-            return jsonify({'group_members': [group_member.user_id for group_member in group_members],'message':'ok'}), 200
+            return jsonify(
+                {'group_members': [group_member.user_id for group_member in group_members], 'message': 'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
