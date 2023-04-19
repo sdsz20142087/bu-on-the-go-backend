@@ -132,7 +132,15 @@ class Group(db.Model):
 
 class GroupMember(db.Model):
     group_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(CHAR(36, charset='utf8mb4'))
+    user_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True)
 
     def __repr__(self):
         return '<GroupMember {}{}>'.format(self.group_id, self.user_id)
+
+class GroupInvite(db.Model):
+    group_id = db.Column(db.Integer, primary_key=True)
+    user_email = db.Column(db.String(255), primary_key=True)
+    status = db.Column(db.Enum('FAIL', 'SUCCESS','PENDING'))
+
+    def __repr__(self):
+        return '<GroupInvite {}{}>'.format(self.group_id, self.user_email)

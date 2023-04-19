@@ -337,10 +337,10 @@ def list_group(user_id):
 def group(user_id, group_id):
     group = Group.query.get(group_id)
     if group:
-        # check if user is in group
-        group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
-        if group_member:
-            return jsonify({'group': serialize(group), 'message': 'ok'}), 200
+        # # check if user is in group
+        # group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+        # if group_member:
+        return jsonify({'group': serialize(group), 'message': 'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
@@ -429,6 +429,59 @@ def delete_group(user_id, group_id):
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
+@bp.route('/invite/list', methods=['GET'])
+@authenticate
+def list_group_invite(user_id):
+    user_email = User.query.get(user_id).email
+    group_invites = GroupInvite.query.filter_by(user_email=user_email).all()
+    return jsonify({'group_invites': [serialize(group_invite) for group_invite in group_invites], 'message': 'ok'}), 200
+
+@bp.route('/invite/listGroup', methods=['GET'])
+@authenticate
+def list_group_invite_group(user_id):
+    group_id = request.values.get('group_id')
+    group_invites = GroupInvite.query.filter_by(group_id=group_id).all()
+    return jsonify({'group_invites': [serialize(group_invite) for group_invite in group_invites], 'message': 'ok'}), 200
+
+@bp.route('/invite',methods=['POST'])
+@authenticate
+def update_group_invite(user_id):
+    group_id = request.values.get('group_id')
+    user_email = request.values.get('user_email')
+    status = request.values.get('status')
+    if status not in ['SUCCESS','FAIL','PENDING']:
+        return jsonify({'message': 'Invalid status.'}), 400
+    group_invite = GroupInvite.query.filter_by(group_id=group_id, user_email=user_email).first()
+    user = User.query.filter_by(email=user_email).first()
+    user_id = user.user_id
+    if not user:
+        return jsonify({'message': 'User not found.'}), 404
+    if group_invite:
+        old_status = group_invite.status
+        group_invite.status = status
+        db.session.commit()
+        if status == 'SUCCESS':
+            # add the user to the group
+            try:
+                group_member = GroupMember(group_id=group_id, user_id=user_id)
+                db.session.add(group_member)
+                db.session.commit()
+            except:
+                pass
+        if status == "FAIL":
+            try:
+                group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+                db.session.delete(group_member)
+                db.session.commit()
+            except:
+                pass
+        return jsonify({'message': 'Group invite updated successfully.'}), 200
+    else:
+        # create a new invite
+        group_invite = GroupInvite(group_id=group_id, user_email=user_email, status=status)
+        db.session.add(group_invite)
+        db.session.commit()
+        return jsonify({'message': 'Group invite created successfully.'}), 200
 
 @bp.route('/sync', methods=['POST'])
 @authenticate
