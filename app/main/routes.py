@@ -158,10 +158,16 @@ def delete_event(user_id, event_id):
 @bp.route('/shared_event/<int:event_id>', methods=['GET'])
 @authenticate
 def get_shared_event(user_id, event_id):
-    shared_event = SharedEvent.query.filter_by(event_id=event_id, owner_id=user_id).first()
-    if not shared_event:
+    # get all shared events which the user is the owner
+    shared_events = SharedEvent.query.filter_by(event_id=event_id, owner_id=user_id).all()
+    # get all shared events which the user is the one of the participants
+    shared_events_as_part = SharedEventParticipance.query.filter_by(user_id=user_id).all()
+    for shared_event in shared_events_as_part:
+        shared_events.extend(
+            SharedEvent.query.filter_by(shared_event_id=shared_event.shared_event_id, event_id=event_id).all())
+    if not shared_events:
         return jsonify({'message': 'Shared event not found.'}), 404
-    return jsonify({'shared_event': serialize(shared_event)}), 200
+    return jsonify({'shared_event': serialize(shared_events)}), 200
 
 
 @bp.route('/shared_event/<int:event_id>', methods=['POST'])
@@ -207,6 +213,7 @@ def shared_event_participance_list(user_id, shared_event_id):
     return jsonify({'shared_event_participances': [serialize(shared_event_participance) for shared_event_participance in
                                                    shared_event_participances]}), 200
 
+
 @bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['GET'])
 @authenticate
 def get_shared_event_participance(user_id, shared_event_participance_id):
@@ -219,6 +226,7 @@ def get_shared_event_participance(user_id, shared_event_participance_id):
     if owner_id != user_id and user_id != shared_event_participance.user_id:
         return jsonify({'message': 'You are not authorized to view this shared event.'}), 401
     return jsonify({'shared_event_participance': serialize(shared_event_participance)}), 200
+
 
 @bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['POST'])
 @authenticate
@@ -235,6 +243,7 @@ def update_shared_event_participance(user_id, shared_event_participance_id):
     shared_event_participance.status = status
     db.session.commit()
     return jsonify({'message': 'Shared event participance updated successfully.'}), 200
+
 
 @bp.route('/shared_event_participance', methods=['POST'])
 @authenticate
