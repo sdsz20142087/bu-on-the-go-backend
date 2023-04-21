@@ -117,13 +117,41 @@ def login():
         return jsonify({'message': 'Invalid credentials.'}), 401
 
 
+# use this to help a user add access to an event
+@bp.route('/calendar_event', methods=['POST'])
+@authenticate
+def add_calendar_event(user_id):
+    calendar_id = request.values.get('calendar_id')
+    calendar = Calendar.query.get(calendar_id)
+    if not calendar:
+        return jsonify({'message': 'Calendar not found.'}), 404
+    # check if the user has this calendar
+    if calendar.user_id != user_id:
+        return jsonify({'message': 'No access to this calendar.'}), 403
+    # check if the event already exists
+    event_id = request.values.get('event_id')
+    event = Event.query.get(event_id)
+    if not event:
+        return jsonify({'message': 'Event not found.'}), 404
+    # create a new calendar event
+    calendar_event = CalendarEvent(calendar_id=calendar_id, event_id=event_id)
+    try:
+        db.session.add(calendar_event)
+        db.session.commit()
+        print('Calendar event created successfully.', serialize(calendar_event))
+    except Exception as e:
+        print(e)
+        return jsonify({'message': 'Calendar event creation failed.'}), 500
+
+
 @bp.route('/event/list', methods=['GET'])
 @authenticate
 def event_list(user_id):
     # get all calendars for the user
     calendars = Calendar.query.filter_by(user_id=user_id).all()
-    # get all events for the user
+    # get all events for the user himself/herself
     events = Event.query.filter(Event.calendar_id.in_([calendar.calendar_id for calendar in calendars])).all()
+    # get all shared events
 
     return jsonify({'events': [serialize(event) for event in events]}), 200
 
@@ -435,12 +463,14 @@ def delete_group(user_id, group_id):
     else:
         return jsonify({'message': 'Group not found.'}), 404
 
+
 @bp.route('/invite/list', methods=['GET'])
 @authenticate
 def list_group_invite(user_id):
     user_email = User.query.get(user_id).email
     group_invites = GroupInvite.query.filter_by(user_email=user_email).all()
     return jsonify({'group_invites': [serialize(group_invite) for group_invite in group_invites], 'message': 'ok'}), 200
+
 
 @bp.route('/invite/listGroup', methods=['GET'])
 @authenticate
@@ -449,13 +479,14 @@ def list_group_invite_group(user_id):
     group_invites = GroupInvite.query.filter_by(group_id=group_id).all()
     return jsonify({'group_invites': [serialize(group_invite) for group_invite in group_invites], 'message': 'ok'}), 200
 
-@bp.route('/invite',methods=['POST'])
+
+@bp.route('/invite', methods=['POST'])
 @authenticate
 def update_group_invite(user_id):
     group_id = request.values.get('group_id')
     user_email = request.values.get('user_email')
     status = request.values.get('status')
-    if status not in ['SUCCESS','FAIL','PENDING']:
+    if status not in ['SUCCESS', 'FAIL', 'PENDING']:
         return jsonify({'message': 'Invalid status.'}), 400
     group_invite = GroupInvite.query.filter_by(group_id=group_id, user_email=user_email).first()
     user = User.query.filter_by(email=user_email).first()
@@ -488,6 +519,7 @@ def update_group_invite(user_id):
         db.session.add(group_invite)
         db.session.commit()
         return jsonify({'message': 'Group invite created successfully.'}), 200
+
 
 @bp.route('/sync', methods=['POST'])
 @authenticate
