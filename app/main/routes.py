@@ -74,6 +74,7 @@ def google_login():
         token = jwt.encode({'user_id': user.user_id}, 'secret',
                            algorithm='HS256').decode('utf-8')
         print('jwt', token)
+        print('user', serialize(user))
         return jsonify({'token': "Bearer " + token, 'message': 'Login successful.', 'user': serialize(user)}), 200
     except Exception as e:
         print(e)
@@ -109,6 +110,8 @@ def login():
     email = request.values.get('email')
     password = request.values.get('password')
     user = User.query.filter_by(email=email).first()
+    print(len(user.password))
+    print(len(password))
     if user and user.password == password:
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
@@ -225,7 +228,7 @@ def delete_event(user_id, event_id):
         return jsonify({'message': 'Event not found.'}), 404
 
 
-@bp.route('/shared_event/<int:event_id>', methods=['GET'])
+@bp.route('/shared_event/<string:event_id>', methods=['GET'])
 @authenticate
 def get_shared_event(user_id, event_id):
     # get all shared events which the user is the owner
@@ -240,7 +243,7 @@ def get_shared_event(user_id, event_id):
     return jsonify({'shared_event': serialize(shared_events)}), 200
 
 
-@bp.route('/shared_event/<int:event_id>', methods=['POST'])
+@bp.route('/shared_event/<string:event_id>', methods=['POST'])
 @authenticate
 def create_shared_event(user_id, event_id):
     # check if the user has a calendar that has this event
@@ -270,7 +273,7 @@ def delete_shared_event(user_id):
         return jsonify({'message': 'Shared event not found.'}), 404
 
 
-@bp.route('/shared_event_participance/int:shared_event_id/list', methods=['GET'])
+@bp.route('/shared_event_participance/<int:shared_event_id>/list', methods=['GET'])
 @authenticate
 def shared_event_participance_list(user_id, shared_event_id):
     shared_event = SharedEvent.query.get(shared_event_id)
