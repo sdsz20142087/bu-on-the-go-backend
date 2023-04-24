@@ -91,7 +91,8 @@ def register():
     password = request.values.get('password')
     user_type = request.values.get('user_type')
     # print(email, full_name, password, user_type)
-    user = User(email=email, full_name=full_name, password=password, user_type=user_type)
+    user_id = str(uuid.uuid4())
+    user = User(user_id=user_id, email=email, full_name=full_name, password=password, user_type=user_type)
     try:
         db.session.add(user)
         db.session.commit()
