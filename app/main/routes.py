@@ -11,10 +11,13 @@ def serialize(obj):
     data = {}
     for c in obj.__table__.columns:
         # print(c.name, getattr(obj, c.name))
-        if c.name == 'created_at':
+        if c.name in ['created_at','start_time','end_time','checkin_time']:
             data[c.name] = getattr(obj, c.name).astimezone().isoformat()
+        elif c.name in ['latitude','longitude']:
+            data[c.name] = float(getattr(obj, c.name))
         else:
             data[c.name] = getattr(obj, c.name)
+    print(data)
     return data
 
 
@@ -88,7 +91,7 @@ def register():
     email = request.values.get('email')
     full_name = request.values.get('full_name')
     # created_at = time.time()
-    # print(created_at)
+    # print(created_at) 
     password = request.values.get('password')
     user_type = request.values.get('user_type')
     # print(email, full_name, password, user_type)
@@ -116,6 +119,7 @@ def login():
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
                            algorithm='HS256').decode('utf-8')
+        print('user:', serialize(user))
         return jsonify({'token': "Bearer " + token, 'message': 'Login successful.', 'user': serialize(user)}), 200
     else:
         return jsonify({'message': 'Invalid credentials.'}), 401
@@ -152,15 +156,17 @@ def add_calendar_event(user_id):
 @authenticate
 def event_list(user_id):
     # get all calendars for the user
-    calendars = Calendar.query.filter_by(user_id=user_id).all()
+    #calendars = Calendar.query.filter_by(user_id=user_id).all()
+    userevents = EventUser.query.filter_by(user_id=user_id).all()
     # get all events for the user himself/herself
-    events = Event.query.filter(Event.calendar_id.in_([calendar.calendar_id for calendar in calendars])).all()
+    events = Event.query.filter(Event.event_id.in_([ue.event_id for ue in userevents])).all()
     # get all shared events
+    print(events)
+    print(json.dumps([serialize(event) for event in events]))
+    return jsonify({'events': [serialize(event) for event in events],'message':'ok'}), 200
 
-    return jsonify({'events': [serialize(event) for event in events]}), 200
 
-
-@bp.route('/event/<int:event_id>', methods=['GET'])
+@bp.route('/event/<string:event_id>', methods=['GET'])
 @authenticate
 def event_details(user_id, event_id):
     event = Event.query.get(event_id)
@@ -171,7 +177,7 @@ def event_details(user_id, event_id):
     calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
     if len(calendar_events) > 0:
         # user has access to this event
-        return jsonify({'event': serialize(event)}), 200
+        return jsonify({'event': serialize(event),'message':'ok'}), 200
     else:
         return jsonify({'message': 'You are not authorized to view this event.'}), 401
 
@@ -186,6 +192,8 @@ def get_user(user_id):
     return jsonify({'user': serialize(u), 'message': 'ok'}), 200
 
 def iso_str_to_datetime(iso_str: str)->datetime.datetime:
+    if iso_str.endswith("Z"):
+        iso_str = iso_str[:-1] + "+00:00"
     return datetime.datetime.fromisoformat(iso_str)
 
 
@@ -193,10 +201,6 @@ def iso_str_to_datetime(iso_str: str)->datetime.datetime:
 @authenticate
 def create_event(user_id):
     try:
-        # get user's calendars
-        calendars = Calendar.query.filter_by(email=User.query.get(user_id).email).all()
-        calendar = calendars[0]  # TODO: handle multiple calendars
-        calendar_id = calendar.calendar_id
         event_id = request.values.get('event_id')
         event_name = request.values.get('event_name')
         latitude = request.values.get('latitude')
@@ -211,9 +215,11 @@ def create_event(user_id):
         priority = request.values.get('priority')
         desc = request.values.get('desc')
         notify_time = request.values.get('notify_time') or 30
-        event = Event(event_id=event_id, event_name=event_name, calendar_id=calendar_id, latitude=latitude, longitude=longitude,
+        event = Event(event_id=event_id, event_name=event_name, latitude=latitude, longitude=longitude,
                       start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc, notify_time=notify_time)
+        eventuser = EventUser(event_id=event_id, user_id=user_id)
         db.session.add(event)
+        db.session.add(eventuser)
         db.session.commit()
         return jsonify({'message': 'Event created successfully.'}), 201
     except Exception as e:

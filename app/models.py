@@ -75,6 +75,12 @@ class Event(db.Model):
     #     return { 'event_id': self.event_id, 'event_name': self.event_name, 'latitude': self.latitude, 'longitude': self.longitude, 'start_time': self.start_time.astimezone().isoformat(),
     #              'end_time': self.end_time.astimezone().isoformat(), 'repeat_mode': self.repeat_mode, 'priority': self.priority, 'desc': self.desc}
 
+class EventUser(db.Model):
+    event_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True)
+    user_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True)
+
+    def __repr__(self):
+        return '<EventUser {}{}>'.format(self.event_id, self.user_id)
 
 class CalendarEvent(db.Model):
     __tablename__ = 'calendar_event'
