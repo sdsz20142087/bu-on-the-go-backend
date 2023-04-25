@@ -101,6 +101,7 @@ class SharedEvent(db.Model):
     owner_id = db.Column(CHAR(36, charset='utf8mb4'))  # , db.ForeignKey('user.user_id'))
     created_at = db.Column(db.DateTime(timezone=True), default=db.func.now(), nullable=False)
     checkin_time = db.Column(db.DateTime(timezone=True))
+    desc = db.Column(db.Text)
 
     def __repr__(self):
         return '<SharedEvent {}>'.format(self.shared_event_id)

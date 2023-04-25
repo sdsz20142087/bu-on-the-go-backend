@@ -232,10 +232,10 @@ def create_event(user_id):
 def delete_event(user_id, event_id):
     event = Event.query.get(event_id)
     if event:
-        calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
-        calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
-        if len(calendar_events) == 0:
-            return jsonify({'message': 'You are not authorized to delete this event.'}), 401
+        #calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
+        #calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
+        #if len(calendar_events) == 0:
+        #    return jsonify({'message': 'You are not authorized to delete this event.'}), 401
         db.session.delete(event)
         db.session.commit()
         return jsonify({'message': 'Event deleted successfully.'}), 200
@@ -262,11 +262,12 @@ def get_shared_event(user_id, event_id):
 @authenticate
 def create_shared_event(user_id, event_id):
     # check if the user has a calendar that has this event
-    calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
-    calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
-    if len(calendar_events) == 0:
-        return jsonify({'message': 'You are not authorized to share this event.'}), 401
-    shared_event = SharedEvent(event_id=event_id, owner_id=user_id)
+    #calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
+    #calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
+    #if len(calendar_events) == 0:
+    #    return jsonify({'message': 'You are not authorized to share this event.'}), 401
+    desc = request.values.get('desc')
+    shared_event = SharedEvent(event_id=event_id, owner_id=user_id, desc=desc)
     db.session.add(shared_event)
     db.session.commit()
     return jsonify({'message': 'Shared event created successfully.'}), 201
