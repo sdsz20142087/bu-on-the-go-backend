@@ -185,6 +185,9 @@ def get_user(user_id):
         return jsonify({'message': 'User not found.'}), 404
     return jsonify({'user': serialize(u), 'message': 'ok'}), 200
 
+def iso_str_to_datetime(iso_str: str)->datetime.datetime:
+    return datetime.datetime.fromisoformat(iso_str)
+
 
 @bp.route('/event', methods=['POST'])
 @authenticate
@@ -194,16 +197,22 @@ def create_event(user_id):
         calendars = Calendar.query.filter_by(email=User.query.get(user_id).email).all()
         calendar = calendars[0]  # TODO: handle multiple calendars
         calendar_id = calendar.calendar_id
+        event_id = request.values.get('event_id')
         event_name = request.values.get('event_name')
         latitude = request.values.get('latitude')
         longitude = request.values.get('longitude')
         start_time = request.values.get('start_time')
         end_time = request.values.get('end_time')
+        if not start_time or not end_time:
+            return jsonify({'message': 'Start time and end time are required.'}), 400
+        start_time = iso_str_to_datetime(start_time)
+        end_time = iso_str_to_datetime(end_time)
         repeat_mode = request.values.get('repeat_mode')
         priority = request.values.get('priority')
         desc = request.values.get('desc')
-        event = Event(event_name=event_name, calendar_id=calendar_id, latitude=latitude, longitude=longitude,
-                      start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc)
+        notify_time = request.values.get('notify_time') or 30
+        event = Event(event_id=event_id, event_name=event_name, calendar_id=calendar_id, latitude=latitude, longitude=longitude,
+                      start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc, notify_time=notify_time)
         db.session.add(event)
         db.session.commit()
         return jsonify({'message': 'Event created successfully.'}), 201
@@ -212,7 +221,7 @@ def create_event(user_id):
         return jsonify({'message': 'Event creation failed.'}), 500
 
 
-@bp.route('/event/<int:event_id>', methods=['DELETE'])
+@bp.route('/event/<string:event_id>', methods=['DELETE'])
 @authenticate
 def delete_event(user_id, event_id):
     event = Event.query.get(event_id)
