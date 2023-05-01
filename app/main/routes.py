@@ -11,12 +11,14 @@ def serialize(obj):
     data = {}
     for c in obj.__table__.columns:
         # print(c.name, getattr(obj, c.name))
-        if c.name in ['created_at','start_time','end_time','checkin_time']:
-            data[c.name] = getattr(obj, c.name).astimezone().isoformat()
-        elif c.name in ['latitude','longitude']:
-            data[c.name] = float(getattr(obj, c.name))
-        else:
-            data[c.name] = getattr(obj, c.name)
+        if getattr(obj, c.name)!= None:
+            if c.name in ['created_at','start_time','end_time','checkin_time']:
+                print(c.name)
+                data[c.name] = getattr(obj, c.name).astimezone().isoformat()
+            elif c.name in ['latitude','longitude']:
+                data[c.name] = float(getattr(obj, c.name))
+            else:
+                data[c.name] = getattr(obj, c.name)
     print(data)
     return data
 
@@ -255,7 +257,9 @@ def get_shared_event(user_id, event_id):
             SharedEvent.query.filter_by(shared_event_id=shared_event.shared_event_id, event_id=event_id).all())
     if not shared_events:
         return jsonify({'message': 'Shared event not found.'}), 404
-    return jsonify({'shared_event': serialize(shared_events)}), 200
+    shared_events = [serialize(shared_event) for shared_event in shared_events]
+    print(shared_events)
+    return jsonify({'shared_event': shared_events, 'message':'OK'}), 200
 
 
 @bp.route('/shared_event/<string:event_id>', methods=['POST'])
@@ -270,7 +274,7 @@ def create_shared_event(user_id, event_id):
     shared_event = SharedEvent(event_id=event_id, owner_id=user_id, desc=desc)
     db.session.add(shared_event)
     db.session.commit()
-    return jsonify({'message': 'Shared event created successfully.'}), 201
+    return jsonify({'message': 'Shared event created successfully.', 'event': serialize(shared_event)}), 200
 
 
 @bp.route('/shared_event', methods=['DELETE'])
@@ -540,6 +544,19 @@ def update_group_invite(user_id):
         db.session.commit()
         return jsonify({'message': 'Group invite created successfully.'}), 200
 
+@bp.route('/notification', methods=['GET'])
+@authenticate
+def fetch_noti(user_id):
+    # fetch all notifications for the user where status is UNREAD, return them, and set those to READ
+    notifications = UserNotification.query.filter_by(user_id=user_id, status='UNREAD').all()
+    for notification in notifications:
+        notification.status = 'READ'
+    try:
+        db.session.commit()
+    except Exception as e:
+        print(e)
+        pass
+    return jsonify({'notifications': [serialize(notification) for notification in notifications], 'message': 'ok'}), 200
 
 @bp.route('/sync', methods=['POST'])
 @authenticate

@@ -151,3 +151,10 @@ class GroupInvite(db.Model):
 
     def __repr__(self):
         return '<GroupInvite {}{}>'.format(self.group_id, self.user_email)
+    
+class UserNotification(db.Model):
+    notification_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(CHAR(36, charset='utf8mb4'))
+    notification_text = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=db.func.current_time())
+    status = db.Column(db.Enum('UNREAD', 'READ'))
