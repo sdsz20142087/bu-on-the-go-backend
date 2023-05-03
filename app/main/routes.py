@@ -253,8 +253,12 @@ def get_shared_event(user_id, event_id):
     # get all shared events which the user is the one of the participants
     shared_events_as_part = SharedEventParticipance.query.filter_by(user_id=user_id).all()
     for shared_event in shared_events_as_part:
-        shared_events.extend(
-            SharedEvent.query.filter_by(shared_event_id=shared_event.shared_event_id, event_id=event_id).all())
+        extended = SharedEvent.query.filter_by(shared_event_id=shared_event.shared_event_id, event_id=event_id).all()
+        for ext in extended:
+            if ext not in shared_events:
+                shared_events.append(extended)
+    # sort by .id attribute
+    shared_events.sort(key=lambda x: x.shared_event_id)
     if not shared_events:
         return jsonify({'message': 'Shared event not found.'}), 404
     shared_events = [serialize(shared_event) for shared_event in shared_events]
@@ -549,6 +553,7 @@ def update_group_invite(user_id):
 def fetch_noti(user_id):
     # fetch all notifications for the user where status is UNREAD, return them, and set those to READ
     notifications = UserNotification.query.filter_by(user_id=user_id, status='UNREAD').all()
+    data = [serialize(notification) for notification in notifications]
     for notification in notifications:
         notification.status = 'READ'
     try:
@@ -556,7 +561,7 @@ def fetch_noti(user_id):
     except Exception as e:
         print(e)
         pass
-    return jsonify({'notifications': [serialize(notification) for notification in notifications], 'message': 'ok'}), 200
+    return jsonify({'notifications':data, 'message': 'ok'}), 200
 
 @bp.route('/sync', methods=['POST'])
 @authenticate

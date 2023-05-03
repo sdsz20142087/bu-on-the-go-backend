@@ -153,8 +153,9 @@ class GroupInvite(db.Model):
         return '<GroupInvite {}{}>'.format(self.group_id, self.user_email)
     
 class UserNotification(db.Model):
-    notification_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    notification_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True, default=str(uuid.uuid4())) 
     user_id = db.Column(CHAR(36, charset='utf8mb4'))
+    title = db.Column(db.String(255))
     notification_text = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=db.func.current_time())
-    status = db.Column(db.Enum('UNREAD', 'READ'))
+    status = db.Column(db.Enum('UNREAD', 'READ'))  
