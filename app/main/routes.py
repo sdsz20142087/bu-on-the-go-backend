@@ -13,24 +13,24 @@ def serialize(obj):
         # print(c.name, getattr(obj, c.name))
         if getattr(obj, c.name)!= None:
             if c.name in ['created_at','start_time','end_time','checkin_time']:
-                print(c.name)
+                #print(c.name, getattr(obj, c.name)  )
                 data[c.name] = getattr(obj, c.name).astimezone().isoformat()
             elif c.name in ['latitude','longitude']:
                 data[c.name] = float(getattr(obj, c.name))
             else:
                 data[c.name] = getattr(obj, c.name)
-    print(data)
+    #print(data)
     return data
 
 
 def authenticate(func):
     def wrapper(*args, **kwargs):
         token = request.headers.get('Authorization')
-        print('got token:', token)
+        #print('got token:', token)
         if token:
             try:
                 token = token.split(' ')[1]
-                print('token:', token)
+                #print('token:', token)
                 user_id = jwt.decode(token, 'secret', algorithms=['HS256'])['user_id']
                 # put user_id in func's args
                 kwargs['user_id'] = user_id
@@ -163,9 +163,8 @@ def event_list(user_id):
     # get all events for the user himself/herself
     events = Event.query.filter(Event.event_id.in_([ue.event_id for ue in userevents])).all()
     # get all shared events
-    print(events)
-    print(json.dumps([serialize(event) for event in events]))
-    return jsonify({'events': [serialize(event) for event in events],'message':'ok'}), 200
+    #print(json.dumps([serialize(event) for event in events]))
+    return jsonify({'apievents': [serialize(event) for event in events],'message':'ok','events': [serialize(event) for event in events]}), 200
 
 
 @bp.route('/event/<string:event_id>', methods=['GET'])
@@ -175,13 +174,13 @@ def event_details(user_id, event_id):
     if not event:
         return jsonify({'message': 'Event not found.'}), 404
     # check if the user has a calendar that has this event
-    calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
-    calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
-    if len(calendar_events) > 0:
+    #calendar = Calendar.query.filter_by(user_id=user_id).all()[0]  # TODO: handle multiple calendars
+    #calendar_events = CalendarEvent.query.filter_by(event_id=event_id, calendar_id=calendar.calendar_id).all()
+    return jsonify({'event': serialize(event),'message':'ok'}), 200
+    #if len(calendar_events) > 0:
         # user has access to this event
-        return jsonify({'event': serialize(event),'message':'ok'}), 200
-    else:
-        return jsonify({'message': 'You are not authorized to view this event.'}), 401
+    #else:
+    #    return jsonify({'message': 'You are not authorized to view this event.'}), 401
 
 
 @bp.route('/user', methods=['GET'])
@@ -198,32 +197,85 @@ def iso_str_to_datetime(iso_str: str)->datetime.datetime:
         iso_str = iso_str[:-1] + "+00:00"
     return datetime.datetime.fromisoformat(iso_str)
 
+@bp.route('/user/user_type', methods=['PUT'])
+@authenticate
+def update_user_type(user_id):
+    user_type = request.values.get('user_type')
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found.'}), 404
+    user.user_type = user_type
+    try:
+        db.session.commit()
+        print('User updated successfully.', serialize(user))
+    except Exception as e:
+        print(e)
+        return jsonify({'message': 'User update failed.'}), 500
+    return jsonify({'message': 'User updated successfully.', 'user': serialize(user)}), 200
+
 
 @bp.route('/event', methods=['POST'])
 @authenticate
 def create_event(user_id):
-    try:
-        event_id = request.values.get('event_id')
-        event_name = request.values.get('event_name')
-        latitude = request.values.get('latitude')
-        longitude = request.values.get('longitude')
-        start_time = request.values.get('start_time')
-        end_time = request.values.get('end_time')
-        if not start_time or not end_time:
-            return jsonify({'message': 'Start time and end time are required.'}), 400
-        start_time = iso_str_to_datetime(start_time)
-        end_time = iso_str_to_datetime(end_time)
-        repeat_mode = request.values.get('repeat_mode')
-        priority = request.values.get('priority')
-        desc = request.values.get('desc')
-        notify_time = request.values.get('notify_time') or 30
-        event = Event(event_id=event_id, event_name=event_name, latitude=latitude, longitude=longitude,
-                      start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc, notify_time=notify_time)
+    from_stulink = True if request.values.get('stulink') is True else False
+    desc = request.values.get('desc')
+    event_id = request.values.get('event_id')
+    event_name = request.values.get('event_name')
+    latitude = request.values.get('latitude')
+    longitude = request.values.get('longitude')
+    repeat_mode = request.values.get('repeat_mode')
+    priority = request.values.get('priority')
+    desc = request.values.get('desc')
+    notify_time = request.values.get('notify_time') or 30
+    start_time = request.values.get('start_time')
+    end_time = request.values.get('end_time')
+    start_time = iso_str_to_datetime(start_time)
+    end_time = iso_str_to_datetime(end_time)
+    if not start_time or not end_time:
+        return jsonify({'message': 'Start time and end time are required.'}), 400
+
+    if from_stulink:
+        # try to find event with same desc
+        event2 = Event.query.filter_by(desc=desc, event_name=event_name, start_time=start_time, end_time=end_time).first()
+        if not event2:
+            event2 = Event(event_id=event_id, event_name=event_name, latitude=latitude, longitude=longitude,
+              start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc, notify_time=notify_time)
+            db.session.add(event2)
+            msg = "new event created, msg=" + str(event2)
+        else:
+            msg = "event already exists"
         eventuser = EventUser(event_id=event_id, user_id=user_id)
-        db.session.add(event)
         db.session.add(eventuser)
-        db.session.commit()
-        return jsonify({'message': 'Event created successfully.'}), 201
+        try:
+            db.session.commit()
+        except Exception as e:
+            print(e)
+        return jsonify({'message':msg,'event':serialize(event2)}), 200
+
+    try:
+
+        # upsert
+        old_event = Event.query.get(event_id)
+        if old_event:
+            old_event.event_name = event_name
+            old_event.latitude = latitude
+            old_event.longitude = longitude
+            old_event.start_time = start_time
+            old_event.end_time = end_time
+            old_event.repeat_mode = repeat_mode
+            old_event.priority = priority
+            old_event.desc = desc
+            old_event.notify_time = notify_time
+            db.session.commit()
+            return jsonify({'message': 'Event updated successfully.', 'event': serialize(old_event)}), 200
+        else:
+            event = Event(event_id=event_id, event_name=event_name, latitude=latitude, longitude=longitude,
+                      start_time=start_time, end_time=end_time, repeat_mode=repeat_mode, priority=priority, desc=desc, notify_time=notify_time)
+            eventuser = EventUser(event_id=event_id, user_id=user_id)
+            db.session.add(event)
+            db.session.add(eventuser)
+            db.session.commit()
+            return jsonify({'message': 'Event created successfully.','event':serialize(event)}), 201
     except Exception as e:
         print(e)
         return jsonify({'message': 'Event creation failed.'}), 500
@@ -261,9 +313,18 @@ def get_shared_event(user_id, event_id):
     shared_events.sort(key=lambda x: x.shared_event_id)
     if not shared_events:
         return jsonify({'message': 'Shared event not found.'}), 404
-    shared_events = [serialize(shared_event) for shared_event in shared_events]
-    print(shared_events)
-    return jsonify({'shared_event': shared_events, 'message':'OK'}), 200
+    result = []
+    for shared_event in shared_events:
+        participance = SharedEventParticipance.query.filter_by(shared_event_id=shared_event.shared_event_id, user_id=user_id).first()
+        if not participance:
+            continue
+        result.append({
+            'shared_event': serialize(shared_event),
+            'participance': serialize(participance)
+        })
+    #shared_events = [serialize(shared_event) for shared_event in shared_events]
+    #print(shared_events)
+    return jsonify({'shared_events': result, 'message':'OK'}), 200
 
 
 @bp.route('/shared_event/<string:event_id>', methods=['POST'])
@@ -307,8 +368,15 @@ def shared_event_participance_list(user_id, shared_event_id):
     if owner_id != user_id:  # only the owner can view the list of participants
         return jsonify({'message': 'You are not authorized to view this shared event.'}), 401
     shared_event_participances = SharedEventParticipance.query.filter_by(shared_event_id=shared_event_id).all()
-    return jsonify({'shared_event_participances': [serialize(shared_event_participance) for shared_event_participance in
-                                                   shared_event_participances]}), 200
+    users = []
+    for s in shared_event_participances:
+        user = User.query.get(s.user_id)
+        if user:
+            users.append((s, user))
+    result = []
+    for s, u in users:
+        result.append({'shared_event_participance': serialize(s), 'user': serialize(u)})
+    return jsonify({'result':result, 'message':'ok'}), 200
 
 
 @bp.route('/shared_event_participance/<int:shared_event_participance_id>', methods=['GET'])
@@ -341,26 +409,24 @@ def update_shared_event_participance(user_id, shared_event_participance_id):
     db.session.commit()
     return jsonify({'message': 'Shared event participance updated successfully.'}), 200
 
-
+# this is actually a PUT op
 @bp.route('/shared_event_participance', methods=['POST'])
 @authenticate
 def create_shared_event_participance(user_id):  # only the owner or the user themselves can add/edit participants
     shared_event_id = request.values.get('shared_event_id')
-    shared_event = SharedEvent.query.get(shared_event_id)
-    if not shared_event:
-        return jsonify({'message': 'Shared event not found.'}), 404
-    owner_id = shared_event.owner_id
-    if owner_id != user_id:
-        if user_id != request.values.get('user_id'):
-            return jsonify({'message': 'You are not authorized to add participants to this shared event.'}), 401
     user_id = request.values.get('user_id')
     status = request.values.get('status')
+    shared_event_participance = SharedEventParticipance.query.filter_by(shared_event_id=shared_event_id,
+                                                                        user_id=user_id).first()
+    if shared_event_participance:
+        shared_event_participance.status = status
+        db.session.commit()
+        return jsonify({'message': 'Shared event participance updated successfully.'}), 200
     shared_event_participance = SharedEventParticipance(shared_event_id=shared_event_id, user_id=user_id, status=status)
     db.session.add(shared_event_participance)
     db.session.commit()
-    shared_event_participance_id = shared_event_participance.shared_event_participance_id
     return jsonify({'message': 'Shared event participance created successfully.', 'shared_event_participance_id':
-        shared_event_participance_id}), 201
+        shared_event_participance.user_id}), 201
 
 
 @bp.route('/shared_event_participance', methods=['DELETE'])
@@ -413,11 +479,8 @@ def group_member_list(user_id, group_id):
     group = Group.query.get(group_id)
     if group:
         # check if user is in group
-        group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
-        if group_member:
-            group_members = GroupMember.query.filter_by(group_id=group_id).all()
-            return jsonify(
-                {'group_members': [group_member.user_id for group_member in group_members], 'message': 'ok'}), 200
+        group_members = GroupMember.query.filter_by(group_id=group_id).all()
+        return jsonify({'group_members': [group_member.user_id for group_member in group_members], 'message': 'ok'}), 200
     else:
         return jsonify({'message': 'Group not found.'}), 404
 

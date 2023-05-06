@@ -57,8 +57,8 @@ class Calendar(db.Model):
 class Event(db.Model):
     event_id = db.Column(CHAR(36, charset='utf8mb4'), primary_key=True, default=str(uuid.uuid4()))
     event_name = db.Column(db.String(255))
-    latitude = db.Column(db.DECIMAL)
-    longitude = db.Column(db.DECIMAL)
+    latitude = db.Column(db.Float)
+    longitude = db.Column(db.Float)
     start_time = db.Column(db.DateTime(timezone=True))
     end_time = db.Column(db.DateTime(timezone=True))
     repeat_mode = db.Column(db.Integer)
