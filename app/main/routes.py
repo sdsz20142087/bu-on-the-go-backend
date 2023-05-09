@@ -115,8 +115,8 @@ def login():
     email = request.values.get('email')
     password = request.values.get('password')
     user = User.query.filter_by(email=email).first()
-    print(len(user.password))
-    print(len(password))
+    # print(len(user.password))
+    # print(len(password))
     if user and user.password == password:
         # generate token for the user
         token = jwt.encode({'user_id': user.user_id}, 'secret',
@@ -308,7 +308,7 @@ def get_shared_event(user_id, event_id):
         extended = SharedEvent.query.filter_by(shared_event_id=shared_event.shared_event_id, event_id=event_id).all()
         for ext in extended:
             if ext not in shared_events:
-                shared_events.append(extended)
+                shared_events.append(ext)
     # sort by .id attribute
     shared_events.sort(key=lambda x: x.shared_event_id)
     if not shared_events:
@@ -579,6 +579,7 @@ def update_group_invite(user_id):
     status = request.values.get('status')
     if status not in ['SUCCESS', 'FAIL', 'PENDING']:
         return jsonify({'message': 'Invalid status.'}), 400
+    group = Group.query.get(group_id)
     group_invite = GroupInvite.query.filter_by(group_id=group_id, user_email=user_email).first()
     user = User.query.filter_by(email=user_email).first()
     user_id = user.user_id
@@ -592,21 +593,32 @@ def update_group_invite(user_id):
             # add the user to the group
             try:
                 group_member = GroupMember(group_id=group_id, user_id=user_id)
+                noti = UserNotification(user_id=group.owner_id, title="Group Invite", content="User {} has accepted the invitation".format(user.full_name))
+                db.session.add(noti)
                 db.session.add(group_member)
                 db.session.commit()
-            except:
-                pass
+            except Exception as e:
+                print(e)
+                return jsonify({'message': 'Group invite update failed.'}), 500
+                
         if status == "FAIL":
             try:
                 group_member = GroupMember.query.filter_by(group_id=group_id, user_id=user_id).first()
+                noti = UserNotification(user_id=group.owner_id, title="Group Invite", content="User {} has rejected the invitation".format(user.full_name))
+                db.session.add(noti)
                 db.session.delete(group_member)
                 db.session.commit()
-            except:
-                pass
+            except Exception as e:
+                print(e)
+                return jsonify({'message': 'Group invite update failed.'}), 500
+            
         return jsonify({'message': 'Group invite updated successfully.'}), 200
     else:
         # create a new invite
         group_invite = GroupInvite(group_id=group_id, user_email=user_email, status=status)
+        
+        noti = UserNotification(user_id=user.id, title="Group Invite", content="You received a group invite to {}".format(group.group_name))
+        db.session.add(noti)
         db.session.add(group_invite)
         db.session.commit()
         return jsonify({'message': 'Group invite created successfully.'}), 200
